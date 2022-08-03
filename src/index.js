@@ -12,18 +12,25 @@ import React, { useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import Hls from 'hls.js';
 
-function Player({ src })
+function Player({ src, poster })
 {
     const videoRef = useRef(null);
     const playerRef = useRef(null);
 
+    
     const [play, setPlay] = useState(false);
     const [isShareOpened, setIsShareOpened] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [isControlOpened, setIsControlOpened] = useState(true);
+    const [isEndscreenOpened, setIsEndscreenOpened] = useState(false);
     // const [controlCounter, setControlCounter] = useState(null);
     const controlCounter = useRef(null);
     const [progress, setProgress] = useState(0);
+    const [volume, setVolume] = useState(50);
+    const [volumeBeforeMute, setVolumeBeforeMute] = useState(50);
+
+    const progressBarRef = useRef(null);
+    const volumeBarRef = useRef(null);
 
     useEffect(() => {
         if (!videoRef) return;
@@ -36,7 +43,10 @@ function Player({ src })
             hls.attachMedia(videoRef.current);
         }
 
-        videoRef.current.addEventListener('play', () => {            
+        videoRef.current.volume = (volume % 100) / 100;
+
+        videoRef.current.addEventListener('play', () => {      
+            setIsEndscreenOpened(false);      
             setPlay(true);
         });
 
@@ -44,8 +54,18 @@ function Player({ src })
             setPlay(false);
         });
 
-        videoRef.current.addEventListener('timeupdate', (event) => {
+        videoRef.current.addEventListener('timeupdate', () => {
             setProgress(Math.round(videoRef.current.currentTime / videoRef.current.duration * 1000) / 10);
+        });
+
+        videoRef.current.addEventListener('ended', () => {
+            setIsEndscreenOpened(true);
+        })
+        videoRef.current.addEventListener('volumechange', event => {
+            setVolume(Math.round(videoRef.current.volume * 100));
+            console.log(Math.round(videoRef.current.volume * 100));
+            if (Math.round(videoRef.current.volume * 100) > 0)
+                setVolumeBeforeMute(Math.round(videoRef.current.volume * 100));
         });
 
         playerRef.current.addEventListener('fullscreenchange', () => {
@@ -103,59 +123,78 @@ function Player({ src })
         navigator.clipboard.writeText(window.location.href);
     }
 
+    function onProgressBarClick(event) {
+        event.stopPropagation();
+        const rect = progressBarRef.current.getBoundingClientRect();
+        const progress = Math.max(Math.min(Math.round((event.clientX - rect.x) / rect.width * 100), 100), 0);
+        videoRef.current.pause();
+        videoRef.current.currentTime = videoRef.current.duration * progress / 100;
+        videoRef.current.play();
+    }
+
+    function onVolumeBarClick(event) {
+        event.stopPropagation();
+        const rect = volumeBarRef.current.getBoundingClientRect();
+        const progress = Math.max(Math.min(Math.round((event.clientX - rect.x) / rect.width * 100), 100), 0);
+        videoRef.current.volume = progress / 100;
+    }
+
     return (
         <div className='w-full h-96 relative bg-black' ref={playerRef}>
-            {isShareOpened && 
-                <div className='absolute top-0 left-0 w-full h-full flex flex-row justify-center items-center z-20' 
-                    onClick={() => setIsShareOpened(false)}>
-                    <div className='absolute top-0 left-0 w-full h-full flex flex-row items-center justify-center bg-black bg-opacity-50 backdrop-blur z-30'>
-                        <div className='p-4 bg-white shadow w-80 relative'>
-                            <div className="w-full flex flex-row items-center justify-between">
-                                <div>分享</div>
-                                <button onClick={event => {event.stopPropagation(); setIsShareOpened(false)}}>
-                                    <i className="fa-solid fa-xmark"></i>
-                                </button>
-                            </div>
-                            <div className="flex flex-row mt-8 gap-4">
-                                <div className="flex flex-col items-center gap-2" 
-                                    onClick={event => {event.stopPropagation(); shareWithFacebook()}}>
-                                    <button className='rounded-full w-16 h-16 bg-[#1877f2]'>
-                                        <i className="fa-brands fa-facebook text-white text-xl"></i>
+            <>
+                {isShareOpened && 
+                    <div className='absolute top-0 left-0 w-full h-full flex flex-row justify-center items-center z-20' 
+                        onClick={() => setIsShareOpened(false)}>
+                        <div className='absolute top-0 left-0 w-full h-full flex flex-row items-center justify-center bg-black bg-opacity-50 backdrop-blur z-30'>
+                            <div className='p-4 bg-white shadow w-80 relative'>
+                                <div className="w-full flex flex-row items-center justify-between">
+                                    <div>分享</div>
+                                    <button onClick={event => {event.stopPropagation(); setIsShareOpened(false)}}>
+                                        <i className="fa-solid fa-xmark"></i>
                                     </button>
-                                    <span className='text-xs'>Facebook</span>
                                 </div>
-                                <div className="flex flex-col items-center gap-2" 
-                                    onClick={event => {event.stopPropagation(); shareWithTwitter()}}>
-                                    <button className='rounded-full w-16 h-16 bg-[#1da1f2]'>
-                                        <i className="fa-brands fa-twitter text-white text-xl"></i>
-                                    </button>
-                                    <span className='text-xs'>Twitter</span>
+                                <div className="flex flex-row mt-8 gap-4">
+                                    <div className="flex flex-col items-center gap-2" 
+                                        onClick={event => {event.stopPropagation(); shareWithFacebook()}}>
+                                        <button className='rounded-full w-16 h-16 bg-[#1877f2]'>
+                                            <i className="fa-brands fa-facebook text-white text-xl"></i>
+                                        </button>
+                                        <span className='text-xs'>Facebook</span>
+                                    </div>
+                                    <div className="flex flex-col items-center gap-2" 
+                                        onClick={event => {event.stopPropagation(); shareWithTwitter()}}>
+                                        <button className='rounded-full w-16 h-16 bg-[#1da1f2]'>
+                                            <i className="fa-brands fa-twitter text-white text-xl"></i>
+                                        </button>
+                                        <span className='text-xs'>Twitter</span>
+                                    </div>
+                                    <div className="flex flex-col items-center gap-2" 
+                                        onClick={event => {event.stopPropagation(); copyLink()}}>
+                                        <button className='rounded-full w-16 h-16 bg-slate-500'>
+                                            <i className="fa-brands fa-twitter text-white text-xl"></i>
+                                        </button>
+                                        <span className='text-xs'>Link</span>
+                                    </div>
                                 </div>
-                                <div className="flex flex-col items-center gap-2" 
-                                    onClick={event => {event.stopPropagation(); copyLink()}}>
-                                    <button className='rounded-full w-16 h-16 bg-slate-500'>
-                                        <i className="fa-brands fa-twitter text-white text-xl"></i>
-                                    </button>
-                                    <span className='text-xs'>Link</span>
+                                <div className='mt-8 flex flex-row gap-4'>
+                                    <input className='w-full p-2 border rounded bg-gray-200 border-gray-300 text-sm text-gray-800' readOnly={true}
+                                        onClick={event => event.stopPropagation()}
+                                        value={window.location.href}/>
+                                    <button className='py-2 px-4 min-w-fit text-blue-600 hover:bg-blue-200 rounded transition-all outline-none' 
+                                        onClick={event => {event.stopPropagation(); copyLink()}}>複製</button>
                                 </div>
                             </div>
-                            <div className='mt-8 flex flex-row gap-4'>
-                                <input className='w-full p-2 border rounded bg-gray-200 border-gray-300 text-sm text-gray-800' readOnly={true}
-                                    value={window.location.href}/>
-                                <button className='py-2 px-4 min-w-fit text-blue-600 hover:bg-blue-200 rounded transition-all outline-none' 
-                                    onClick={event => {event.stopPropagation(); copyLink()}}>複製</button>
-                            </div>
-                        </div>
-                    </div>   
-                </div>
-            }
+                        </div>   
+                    </div>
+                }
+            </>
             <div className='absolute top-0 left-0 w-full h-full z-10'
                 onClick={() => videoRef.current.paused ? videoRef.current.play() : videoRef.current.pause()}
                 onMouseMove={() => {showControl()}}
                 onMouseOver={() => {showControl()}} 
                 onMouseOut={() => {hideControl()}}>
                 { (!play || isControlOpened) && <>
-                    <div className='absolute top-0 left-0 w-full h-16 p-4 flex flex-row items-center justify-between'>
+                    <div className='absolute top-0 left-0 w-full h-16 p-4 flex flex-row items-center justify-between z-10 bg-gradient-to-b from-black to-transparent'>
                         <div className='flex flex-col'></div>
                         <div>
                             <button className='w-8 h-8' onClick={event => {event.stopPropagation(); setIsShareOpened(true);}}>
@@ -163,55 +202,83 @@ function Player({ src })
                             </button>
                         </div>
                     </div>
-                    <div className='absolute bottom-0 left-0 w-full p-4 flex flex-col gap-4'>
+                    <div className='absolute bottom-0 left-0 w-full p-4 flex flex-col gap-4 z-10 bg-gradient-to-t from-black to-transparent'>
                         <div>
                             <div className='text-white font-bold'>Video Title</div>
                             <div className='text-white text-sm'>Video description</div>
                         </div>
-                        <div className='relative'>
-                            <div className='w-full top-0 left-0 absolute h-0.5 bg-gray-100 bg-opacity-50'></div>
-                            <div className='top-0 left-0 absolute h-0.5 bg-red-500 transition-all' style={{width: `${progress}%`}}></div>
+                        <div className='relative cursor-pointer h-1 hover:h-2' ref={progressBarRef} onClick={onProgressBarClick}>
+                            <div className='w-full top-0 left-0 absolute h-full bg-gray-100 bg-opacity-50'></div>
+                            <div className='top-0 left-0 absolute h-full bg-red-500 transition-all' style={{width: `${progress}%`}}></div>
                         </div>
                         <div className='flex flex-row items-center justify-between gap-4 w-full'>
                             <div className='flex flex-row gap-4'>
                                 <>
                                     {play && 
-                                        <button className='outline-none' 
+                                        <button className='w-8 outline-none' 
                                             onClick={event => {event.stopPropagation(); videoRef.current.pause()}}>
                                             <i className="fa-regular fa-pause text-white text-xl"></i>
                                         </button>
                                     }
                                     {!play && 
-                                        <button className='outline-none' onClick={event => {event.stopPropagation(); videoRef.current.play();}}>
+                                        <button className='w-8 outline-none' onClick={event => {event.stopPropagation(); videoRef.current.play();}}>
                                             <i className="fa-regular fa-play text-white text-xl"></i>
                                         </button>
                                     }
                                 </>
+                                <>
+                                    <div className='flex flex-row items-center gap-2 cursor-pointer'>
+                                        <button className='w-8 outline-none' 
+                                            onClick={event => {
+                                                event.stopPropagation(); 
+                                                videoRef.current.volume = videoRef.current.volume === 0 ? volumeBeforeMute / 100 : 0
+                                            }}>
+                                            {volume === 0 && <i className="fa-solid fa-volume-slash text-white text-xl"></i>}
+                                            {volume <= 30 && volume > 0 && <i className="fa-solid fa-volume-low text-white text-xl"></i>}
+                                            {volume <= 70 && volume > 30 && <i className="fa-solid fa-volume text-white text-xl"></i>}
+                                            {volume > 70 && <i className="fa-solid fa-volume-high text-white text-xl"></i>}
+                                        </button>
+                                        <div className='relative w-24 mt-[-2px]' ref={volumeBarRef} onClick={onVolumeBarClick}>
+                                            <div className='w-full top-0 left-0 absolute h-1 bg-gray-100 bg-opacity-50'></div>
+                                            <div className='top-0 left-0 absolute h-1 bg-red-500 transition-all' style={{width: `${volume}%`}}></div>
+                                        </div>
+                                    </div>
+                                </>
                             </div>
                             <div className='flex flex-row gap-4'>
-                                <button className='outline-none' onClick={event => event.stopPropagation()}>
+                                {/* <button className='w-8 outline-none' onClick={event => event.stopPropagation()}>
                                     <i className="fa-brands fa-chromecast text-white text-xl"></i>
                                 </button>
-                                <button className='outline-none' onClick={event => event.stopPropagation()}>
+                                <button className='w-8 outline-none' onClick={event => event.stopPropagation()}>
                                     <i className="fa-regular fa-gear text-white text-xl"></i>
-                                </button>
+                                </button> */}
                                 <>
-                                    { !isFullscreen && <button className='outline-none' onClick={event => {event.stopPropagation(); playerRef.current.requestFullscreen();}}>
+                                    { !isFullscreen && <button className='w-8 outline-none' onClick={event => {event.stopPropagation(); playerRef.current.requestFullscreen();}}>
                                         <i className="fa-regular fa-expand text-white text-xl"></i>
                                     </button> }
-                                    { isFullscreen && <button className='outline-none' onClick={event => {event.stopPropagation(); document.exitFullscreen()}}>
+                                    { isFullscreen && <button className='w-8 outline-none' onClick={event => {event.stopPropagation(); document.exitFullscreen()}}>
                                         <i className="fa-regular fa-compress text-white text-xl"></i>
                                     </button> }
                                 </>
                             </div>
                         </div>
                     </div>
+                    {isEndscreenOpened && 
+                        <div className='absolute top-0 left-0 w-full h-full flex flex-row items-center justify-center bg-black bg-opacity-50 backdrop-blur'
+                            onClick={() => setIsShareOpened(false)}>
+                                <button onClick={event => {
+                                    event.stopPropagation();
+                                    videoRef.current.pause();
+                                    videoRef.current.currentTime = 0;
+                                    videoRef.current.play();
+                                }}>
+                                    <i className="fa-solid fa-rotate-right text-white text-xl"></i>
+                                </button>
+                        </div>
+                    }
                 </> }
+                
             </div>
-            {/* <div className='absolute top-0 left-0 w-full h-full'
-                onClick={() => {videoRef.current.paused ? videoRef.current.play() : videoRef.current.pause(); console.log(123)}}
-            >                
-            </div> */}
             <div className='absolute top-0 left-0 w-full h-full flex flex-row justify-center items-center'>
                 <video onClick={() => videoRef.current.pause()} 
                     className='w-full h-full max-w-full max-h-full' ref={videoRef}></video>
@@ -224,7 +291,7 @@ window.addEventListener('load', () => {
     const roots = document.getElementsByClassName('namayakeee-player');
     [...roots].forEach(root => {
         ReactDOM.createRoot(root).render(
-            <Player src={root.getAttribute('src')}></Player>
+            <Player src={root.getAttribute('src')} poster={root.getAttribute('poster')}></Player>
         );
     })
   })
