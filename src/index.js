@@ -12,17 +12,17 @@ import React, { useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import Hls from 'hls.js';
 
-function Player({ src, poster })
+function Player({ src, title, description })
 {
     const videoRef = useRef(null);
     const playerRef = useRef(null);
 
-    
     const [play, setPlay] = useState(false);
     const [isShareOpened, setIsShareOpened] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [isControlOpened, setIsControlOpened] = useState(true);
     const [isEndscreenOpened, setIsEndscreenOpened] = useState(false);
+    const [isFloatPlayerOpened, setIsFloatPlayerOpened] = useState(false);
     // const [controlCounter, setControlCounter] = useState(null);
     const controlCounter = useRef(null);
     const [progress, setProgress] = useState(0);
@@ -63,7 +63,6 @@ function Player({ src, poster })
         })
         videoRef.current.addEventListener('volumechange', event => {
             setVolume(Math.round(videoRef.current.volume * 100));
-            console.log(Math.round(videoRef.current.volume * 100));
             if (Math.round(videoRef.current.volume * 100) > 0)
                 setVolumeBeforeMute(Math.round(videoRef.current.volume * 100));
         });
@@ -96,6 +95,14 @@ function Player({ src, poster })
                 else videoRef.current.pause();
             }
         });
+
+        document.addEventListener('scroll', event => {
+            var player = playerRef.current.getBoundingClientRect();
+            const isPlayerOutside = (player.x + player.width) < 0 
+                || (player.y + player.height) < 0
+                || (player.x > window.innerWidth || player.y > window.innerHeight);
+            setIsFloatPlayerOpened(isPlayerOutside);
+        })
     }, []);
 
     function showControl() {
@@ -139,6 +146,23 @@ function Player({ src, poster })
         videoRef.current.volume = progress / 100;
     }
 
+    function onVolumeHandleMouseMove(event) {
+        const volumeBar = volumeBarRef.current.getBoundingClientRect();
+        const handle = event.target.getBoundingClientRect();        
+        // const handleCenterX = handle.left + ((handle.right - handle.left) / 2);
+        const progress = (event.clientX - volumeBar.x) / volumeBar.width * 100;
+        videoRef.current.volume = progress / 100;
+    }
+
+    function onVolumeHandleMouseDown(event) {
+        event.stopPropagation();
+        volumeBarRef.current.addEventListener('mousemove', onVolumeHandleMouseMove);
+        document.addEventListener('mouseup', () => {
+            console.log('asd');
+            volumeBarRef.current.removeEventListener('mousemove', onVolumeHandleMouseMove);
+        }, {once: true})
+    }
+
     return (
         <div className='w-full h-96 relative bg-black' ref={playerRef}>
             <>
@@ -171,7 +195,7 @@ function Player({ src, poster })
                                     <div className="flex flex-col items-center gap-2" 
                                         onClick={event => {event.stopPropagation(); copyLink()}}>
                                         <button className='rounded-full w-16 h-16 bg-slate-500'>
-                                            <i className="fa-brands fa-twitter text-white text-xl"></i>
+                                            <i className="fa-solid fa-link-horizontal text-white text-xl"></i>
                                         </button>
                                         <span className='text-xs'>Link</span>
                                     </div>
@@ -189,7 +213,9 @@ function Player({ src, poster })
                 }
             </>
             <div className='absolute top-0 left-0 w-full h-full z-10'
-                onClick={() => videoRef.current.paused ? videoRef.current.play() : videoRef.current.pause()}
+                onClick={() => {
+                    if (isControlOpened) videoRef.current.paused ? videoRef.current.play() : videoRef.current.pause()
+                }}
                 onMouseMove={() => {showControl()}}
                 onMouseOver={() => {showControl()}} 
                 onMouseOut={() => {hideControl()}}>
@@ -197,19 +223,19 @@ function Player({ src, poster })
                     <div className='absolute top-0 left-0 w-full h-16 p-4 flex flex-row items-center justify-between z-10 bg-gradient-to-b from-black to-transparent'>
                         <div className='flex flex-col'></div>
                         <div>
-                            <button className='w-8 h-8' onClick={event => {event.stopPropagation(); setIsShareOpened(true);}}>
+                            {/* <button className='w-8 h-8' onClick={event => {event.stopPropagation(); setIsShareOpened(true);}}>
                                 <i className="fa-regular fa-share-nodes text-white text-xl"></i>
-                            </button>
+                            </button> */}
                         </div>
                     </div>
                     <div className='absolute bottom-0 left-0 w-full p-4 flex flex-col gap-4 z-10 bg-gradient-to-t from-black to-transparent'>
                         <div>
-                            <div className='text-white font-bold'>Video Title</div>
-                            <div className='text-white text-sm'>Video description</div>
+                            {title && <div className='text-white font-bold'>{ title }</div>}
+                            {description && <div className='text-white text-sm'>{ description }</div>}
                         </div>
-                        <div className='relative cursor-pointer h-1 hover:h-2' ref={progressBarRef} onClick={onProgressBarClick}>
+                        <div className='relative cursor-pointer h-1' ref={progressBarRef} onClick={onProgressBarClick}>
                             <div className='w-full top-0 left-0 absolute h-full bg-gray-100 bg-opacity-50'></div>
-                            <div className='top-0 left-0 absolute h-full bg-red-500 transition-all' style={{width: `${progress}%`}}></div>
+                            <div className='top-0 left-0 absolute h-full bg-red-500' style={{width: `${progress}%`}}></div>
                         </div>
                         <div className='flex flex-row items-center justify-between gap-4 w-full'>
                             <div className='flex flex-row gap-4'>
@@ -238,9 +264,12 @@ function Player({ src, poster })
                                             {volume <= 70 && volume > 30 && <i className="fa-solid fa-volume text-white text-xl"></i>}
                                             {volume > 70 && <i className="fa-solid fa-volume-high text-white text-xl"></i>}
                                         </button>
-                                        <div className='relative w-24 mt-[-2px]' ref={volumeBarRef} onClick={onVolumeBarClick}>
-                                            <div className='w-full top-0 left-0 absolute h-1 bg-gray-100 bg-opacity-50'></div>
-                                            <div className='top-0 left-0 absolute h-1 bg-red-500 transition-all' style={{width: `${volume}%`}}></div>
+                                        <div className='relative w-24 h-4 ml-2' ref={volumeBarRef} onClick={onVolumeBarClick}>
+                                            <div className='w-full top-1.5 left-0 absolute h-1 bg-gray-100 bg-opacity-50'></div>
+                                            <div className='top-1.5 left-0 absolute h-1 bg-red-500 transition-all' style={{width: `${volume}%`}}></div>
+                                            <div className="absolute w-4 h-4 top-0 -ml-2 bg-white shadow rounded-full z-10" style={{left: `${volume}%`}}
+                                                onMouseDown={onVolumeHandleMouseDown}
+                                            ></div>
                                         </div>
                                     </div>
                                 </>
@@ -252,6 +281,9 @@ function Player({ src, poster })
                                 <button className='w-8 outline-none' onClick={event => event.stopPropagation()}>
                                     <i className="fa-regular fa-gear text-white text-xl"></i>
                                 </button> */}
+                                <button className='w-8 outline-none' onClick={event => {event.stopPropagation(); setIsShareOpened(true);}}>
+                                    <i className="fa-regular fa-share-nodes text-white text-xl"></i>
+                                </button>
                                 <>
                                     { !isFullscreen && <button className='w-8 outline-none' onClick={event => {event.stopPropagation(); playerRef.current.requestFullscreen();}}>
                                         <i className="fa-regular fa-expand text-white text-xl"></i>
@@ -279,7 +311,7 @@ function Player({ src, poster })
                 </> }
                 
             </div>
-            <div className='absolute top-0 left-0 w-full h-full flex flex-row justify-center items-center'>
+            <div className={`${isFloatPlayerOpened ? 'fixed bottom-4 right-4 w-64 h-36 bg-black' : 'absolute top-0 left-0 w-full h-full flex flex-row justify-center items-center'}`}>
                 <video onClick={() => videoRef.current.pause()} 
                     className='w-full h-full max-w-full max-h-full' ref={videoRef}></video>
             </div>
@@ -291,7 +323,11 @@ window.addEventListener('load', () => {
     const roots = document.getElementsByClassName('namayakeee-player');
     [...roots].forEach(root => {
         ReactDOM.createRoot(root).render(
-            <Player src={root.getAttribute('src')} poster={root.getAttribute('poster')}></Player>
+            <Player 
+                src={root.getAttribute('src')} 
+                poster={root.getAttribute('poster')} 
+                title={root.getAttribute('title')} 
+                description={root.getAttribute('description')}></Player>
         );
     })
   })
