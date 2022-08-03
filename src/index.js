@@ -29,7 +29,7 @@ function Player({ src })
         if (!videoRef) return;
 
         if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
-            video.src = src;
+            videoRef.current.src = src;
         } else if (Hls.isSupported()) {
             const hls = new Hls();
             hls.loadSource(src);
