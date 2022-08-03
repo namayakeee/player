@@ -1,0 +1,11 @@
+@import url('https://cdn.vash.network/fontawesome/6.1.1/css/all.css');
+
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.play {
+    background-image: url('../images/icons/duotone/play.svg');
+    
+}
